@@ -12,7 +12,7 @@ public class HelloWorldPlugin : BasePlugin
     public override string ModuleName => "Hello World Plugin";
     public override string ModuleVersion => "0.0.1";
 
-    public required IRunCommand RunCommand { get; set; }
+    public required IRunCommand RunCommand;
 
     private int movementServices;
     private int movementPtr;
@@ -45,13 +45,11 @@ public class HelloWorldPlugin : BasePlugin
 
     private HookResult OnRunCommand(DynamicHook h)
     {
-        //var player = h.GetParam<CCSPlayer_MovementServices>(0).Pawn.Value.Controller.Value?.As<CCSPlayerController>(); // Linux
-        var player = h.GetParam<CCSPlayer_MovementServices>(movementServices).Pawn.Value.Controller.Value?.As<CCSPlayerController>(); // Windows
+        var player = h.GetParam<CCSPlayer_MovementServices>(movementServices).Pawn.Value.Controller.Value?.As<CCSPlayerController>();
         if (!player.IsPlayer())
             return HookResult.Continue;
 
-        //var userCmd = new CUserCmd(h.GetParam<IntPtr>(1)); // Linux
-        var userCmd = new CUserCmd(h.GetParam<IntPtr>(movementPtr)); // Windows
+        var userCmd = new CUserCmd(h.GetParam<IntPtr>(movementPtr));
         var getMovementButton = userCmd.GetMovementButton();
 
         var movementButtons = string.Join(", ", getMovementButton);
@@ -59,9 +57,8 @@ public class HelloWorldPlugin : BasePlugin
 
         if (getMovementButton.Contains("Left Click"))
         {
-            // cancel the shot if the player is holding the left click
-            // SetLeftClick(h.GetParam<IntPtr>(1)); // Linux
-            SetLeftClick(h.GetParam<IntPtr>(2)); // Windows
+
+            SetLeftClick(h.GetParam<IntPtr>(movementPtr));
         }
 
         return HookResult.Changed;
