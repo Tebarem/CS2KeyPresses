@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 
 using System.Runtime.CompilerServices;
 using CounterStrikeSharp.API.Modules.Memory.DynamicFunctions;
+using System.Runtime.InteropServices;
 
 namespace HelloWorldPlugin;
 
@@ -11,30 +12,64 @@ public class HelloWorldPlugin : BasePlugin
     public override string ModuleName => "Hello World Plugin";
     public override string ModuleVersion => "0.0.1";
 
-    //public required MemoryFunctionVoid<CCSPlayer_MovementServices, IntPtr> RunCommand; // Linux
-    public required MemoryFunctionVoid<IntPtr, IntPtr, IntPtr, CCSPlayer_MovementServices> RunCommand; // Windows
+    public required IRunCommand RunCommand { get; set; }
+
+    private int movementServices;
+    private int movementPtr;
 
     public override void Load(bool hotReload)
     {
-        RunCommand = new(GameData.GetSignature("RunCommand"));
+        RegisterEventHandler<EventWeaponFire>((@event, info) => {
+            Logger.LogInformation($"Weapon Fired");
+
+            return HookResult.Continue;
+        });
+
+        // check if runtime is windows or linux
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            movementServices = 3;
+            movementPtr = 2;
+            RunCommand = new RunCommandWindows();
+        }
+        else
+        {
+            movementServices = 0;
+            movementPtr = 1;
+            RunCommand = new RunCommandLinux();
+        }
+
         RunCommand.Hook(OnRunCommand, HookMode.Pre);
     }
+
 
     private HookResult OnRunCommand(DynamicHook h)
     {
         //var player = h.GetParam<CCSPlayer_MovementServices>(0).Pawn.Value.Controller.Value?.As<CCSPlayerController>(); // Linux
-        var player = h.GetParam<CCSPlayer_MovementServices>(3).Pawn.Value.Controller.Value?.As<CCSPlayerController>(); // Windows
+        var player = h.GetParam<CCSPlayer_MovementServices>(movementServices).Pawn.Value.Controller.Value?.As<CCSPlayerController>(); // Windows
         if (!player.IsPlayer())
             return HookResult.Continue;
 
         //var userCmd = new CUserCmd(h.GetParam<IntPtr>(1)); // Linux
-        var userCmd = new CUserCmd(h.GetParam<IntPtr>(2)); // Windows
+        var userCmd = new CUserCmd(h.GetParam<IntPtr>(movementPtr)); // Windows
         var getMovementButton = userCmd.GetMovementButton();
 
         var movementButtons = string.Join(", ", getMovementButton);
         Logger.LogInformation($"Movement Buttons: {movementButtons}");
 
+        if (getMovementButton.Contains("Left Click"))
+        {
+            // cancel the shot if the player is holding the left click
+            // SetLeftClick(h.GetParam<IntPtr>(1)); // Linux
+            SetLeftClick(h.GetParam<IntPtr>(2)); // Windows
+        }
+
         return HookResult.Changed;
+    }
+
+    private unsafe void SetLeftClick(IntPtr userCmd)
+    {
+        Unsafe.Write((void*)(userCmd + 0x50), Unsafe.Read<IntPtr>((void*)(userCmd + 0x50)) ^ 1);
     }
 
     public override void Unload(bool hotReload)
@@ -91,6 +126,7 @@ public class CUserCmd
         Handle = pointer;
     }
 
+    // we want to return a list and a nint
     public unsafe List<String> GetMovementButton()
     {
         if (Handle == IntPtr.Zero)
@@ -105,6 +141,8 @@ public class CUserCmd
         
         var movementButtons = new List<String>();
 
+        movementButtons.Add(binary);
+
         foreach (var button in buttonNames)
         {
             if ((moveMent & button.Key) == button.Key)
@@ -112,7 +150,6 @@ public class CUserCmd
                 movementButtons.Add(button.Value);
             }
         }
-        
 
         return movementButtons;
     }
