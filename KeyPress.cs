@@ -1,14 +1,6 @@
-﻿using System.Drawing;
 using CounterStrikeSharp.API.Core;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using CounterStrikeSharp.API;
-using System.Text.Json;
-using System.Data;
-using System.Runtime.InteropServices;
 
-using Dapper;
-using Npgsql;
 using System.Runtime.CompilerServices;
 using CounterStrikeSharp.API.Modules.Memory.DynamicFunctions;
 
